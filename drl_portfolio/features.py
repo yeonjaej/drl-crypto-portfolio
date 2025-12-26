@@ -29,11 +29,13 @@ def generate_features(price_df, lookbacks=(20, 60)):
     vol_feats_df = pd.DataFrame(np.stack([vol_short, vol_ratio, vix_proxy], axis=1),
                                  index=log_returns.index)
     
-    # 5. Fill missing values safely
-    vol_feats_df = vol_feats_df.bfill().ffill()
+    # 5. Drop the rows that don't have enough history.
+    vol_feats_df = vol_feats_df.dropna()
 
     # 6. Align prices and features
-    aligned_prices = price_df.loc[log_returns.index].values
+    valid_index = vol_feats_df.index
+    log_returns = log_returns.loc[valid_index]
+    aligned_prices = price_df.loc[valid_index].values
     vol_feats = vol_feats_df.values
 
-    return log_returns, vol_feats, aligned_prices
+    return log_returns, vol_feats, aligned_prices, valid_index
