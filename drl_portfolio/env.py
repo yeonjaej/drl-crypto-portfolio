@@ -20,7 +20,14 @@ class PortfolioEnv(gym.Env):
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
-        self.t = self.lookback
+
+        # randomize start step
+        upper_bound = len(self.data) - self.max_steps - 1
+        if upper_bound > self.lookback:
+            self.t = np.random.randint(self.lookback, upper_bound)
+        else:
+            self.t = self.lookback
+        
         self.cash = 1.0  # normalize portfolio to 1.0
         self.weights = np.zeros(self.n_assets)
         self.portfolio_value = 1.0
