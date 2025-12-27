@@ -1,5 +1,8 @@
-__pycache__/
-*.pyc
-*.pkl
-*.zip
-results/logs/
+# Created by venv; see https://docs.python.org/3/library/venv.html
+results/*
+bin/*
+lib/*
+share/*
+pyvenv.cfg
+etc/*
+*/__pycache__
