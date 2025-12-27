@@ -40,12 +40,14 @@ Interpretation:
 
 ## 🚀 Quick Start
 **Installation**
-```git clone https://github.com/yeonjaej/drl-crypto-portfolio.git
+```
+git clone https://github.com/yeonjaej/drl-crypto-portfolio.git
 cd drl-crypto-portfolio
 pip install -r requirements.txt
 ```
 **Run Analysis**
-```jupyter notebook notebooks/main_analysis.ipynb
+```
+jupyter notebook notebooks/main_analysis.ipynb
 ```
 
 ## Technical details
