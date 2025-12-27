@@ -3,11 +3,12 @@ A deep reinforcement learning approach to dynamic cryptocurrency portfolio manag
 
 ## 📋 Overview
 This project trains a Proximal Policy Optimization (PPO) agent to dynamically manage a 5-asset cryptocurrency portfolio, optimizing for risk-adjusted returns across multiple market regimes (2023-2025).
-Key Results:
 
-Sharpe ratios: 0.90-3.15 across 4 out-of-sample test windows
-Outperformed baselines in 2 of 4 windows (volatile/sideways markets)
-Demonstrated adaptive learning but with high drawdowns (40-79%)
+**Key Results:**
+
+- Sharpe ratios: 0.90-3.15 across 4 out-of-sample test windows
+- Outperformed baselines in 2 of 4 windows (volatile/sideways markets)
+- Demonstrated adaptive learning but with high drawdowns (40-79%)
 
 
 ## 🎯 Key Features
@@ -21,7 +22,8 @@ Demonstrated adaptive learning but with high drawdowns (40-79%)
 
 
 ## 📊 Results
-Performance Summary (Out-of-Sample)
+
+**Performance Summary (Out-of-Sample)**
 |Window|Period      |Regime       |PPO Sharpe|MVO Sharpe  |BTC Sharpe  |PPO MaxDD  | Winner|
 |------|------------|-------------|----------|------------|------------|-----------|-------|
 |     1|Aug-Dec 2023|Bear→Recovery| 1.22     |1.63        |  2.12      | -43.50%   | BTC   |
@@ -37,12 +39,12 @@ Interpretation:
 
 
 ## 🚀 Quick Start
-Installation
+**Installation**
 ```git clone https://github.com/yeonjaej/drl-crypto-portfolio.git
 cd drl-crypto-portfolio
 pip install -r requirements.txt
 ```
-Run Analysis
+**Run Analysis**
 ```jupyter notebook notebooks/main_analysis.ipynb
 ```
 
@@ -62,7 +64,7 @@ d_sharpe = (b_t * Δa - 0.5 * a_t * Δb) / (b_t - a_t²)^1.5
 where a_t = EMA(returns), b_t = EMA(returns²)
 ```
 
-### Training
+### Training 
 
 - Vectorized: 4 parallel environments
 - Total steps: 2M per window
@@ -88,17 +90,20 @@ drl-crypto-portfolio/
 ```
 ## 🔮 Future Work
 
-High Priority (Production Readiness):
+**High Priority:**
 
 1. Transaction costs: Add 0.1-0.5% fees + slippage
 2. Drawdown constraints: Implement max drawdown limits or penalize in reward
 3. Position limits: Cap max allocation per asset (e.g., 40%)
 
 Medium Priority:
+
 4. Ensemble methods (PPO + MVO regime-switching)
 5. Alternative rewards (Sortino, Calmar)
 6. Additional features (sentiment, on-chain metrics)
+
 Low Priority:
+
 7. Alternative RL algorithms (SAC, TD3)
 8. Different rebalancing frequencies (1H, daily, weekly)
 9. Transfer learning from traditional assets
@@ -126,18 +131,18 @@ What Didn't:
 
 Lessons:
 
-Data leakage is subtle—requires careful validation
-Constrained baselines essential for fair comparison
-Sharpe alone insufficient—must consider drawdown, turnover
-RL excels in complex markets but isn't universally superior
+- Data leakage is subtle—requires careful validation
+- Constrained baselines essential for fair comparison
+- Sharpe alone insufficient—must consider drawdown, turnover
+- RL excels in complex markets but isn't universally superior
 
 
 ⚠️ Disclaimer
-For educational purposes only. NOT investment advice.
 
-Backtest results do not guarantee future performance
-No transaction costs, slippage, or market impact modeled
-High drawdowns make this unsuitable for live trading without modifications
+- For educational purposes only. NOT investment advice.
+- Backtest results do not guarantee future performance
+- No transaction costs, slippage, or market impact modeled
+- High drawdowns make this unsuitable for live trading without modifications
 
 
 👤 Author
