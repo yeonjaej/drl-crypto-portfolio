@@ -33,8 +33,8 @@ This project trains a Proximal Policy Optimization (PPO) agent to dynamically ma
 
 Interpretation:
 
-✅ PPO excels in trending (Window 3) and choppy (Window 4) markets
-⚠️ Underperforms during smooth recoveries (Windows 1-2)
+✅ PPO excels in trending (Window 3) and choppy (Window 4) markets\
+⚠️ Underperforms during smooth recoveries (Windows 1-2)\
 🚨 Excessive drawdowns (-79% max) require risk constraints for production
 
 
