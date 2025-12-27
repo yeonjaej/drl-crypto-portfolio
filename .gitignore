@@ -6,4 +6,3 @@ share/*
 pyvenv.cfg
 etc/*
 */__pycache__
-.DS_STORE
