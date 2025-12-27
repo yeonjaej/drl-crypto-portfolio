@@ -40,10 +40,11 @@ def generate_time_windows(price_df, train_years=3.5, test_years=0.5):
         test_start = train_end + pd.Timedelta(days=1)
         test_end = test_start + pd.Timedelta(days=test_days - 1)
 
-        windows.append((
-            train_start.strftime("%Y-%m-%d"), train_end.strftime("%Y-%m-%d"),
-            test_start.strftime("%Y-%m-%d"), test_end.strftime("%Y-%m-%d")
-        ))
+        windows.append((train_start, train_end, test_start, test_end))
+
+        #    train_start.strftime("%Y-%m-%d"), train_end.strftime("%Y-%m-%d"),
+        #    test_start.strftime("%Y-%m-%d"), test_end.strftime("%Y-%m-%d")
+        #))
 
         # Slide by test days 
         current_start += pd.Timedelta(days=test_days)
