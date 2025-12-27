@@ -1,7 +1,7 @@
-🧠 Deep Reinforcement Learning for Cryptocurrency Portfolio Optimization
+# 🧠 Deep Reinforcement Learning for Cryptocurrency Portfolio Optimization
 A deep reinforcement learning approach to dynamic cryptocurrency portfolio management using PPO and differential Sharpe ratio rewards.
 
-📋 Overview
+## 📋 Overview
 This project trains a Proximal Policy Optimization (PPO) agent to dynamically manage a 5-asset cryptocurrency portfolio, optimizing for risk-adjusted returns across multiple market regimes (2023-2025).
 Key Results:
 
@@ -10,7 +10,7 @@ Outperformed baselines in 2 of 4 windows (volatile/sideways markets)
 Demonstrated adaptive learning but with high drawdowns (40-79%)
 
 
-🎯 Key Features
+## 🎯 Key Features
 
 Algorithm: PPO with 2-layer MLP policy (Stable-Baselines3)
 Reward: Differential Sharpe ratio for online risk-adjusted learning
@@ -20,13 +20,15 @@ Validation: Walk-forward testing with strict temporal alignment (no data leakage
 Baselines: Constrained MVO (10-50% position limits), BTC buy-and-hold, equal-weight
 
 
-📊 Results
+## 📊 Results
 Performance Summary (Out-of-Sample)
-Window  Period  Regime  PPO Sharpe  MVO Sharpe  BTC Sharpe  PPO MaxDD   Winner
-1Aug-Dec 2023   Bear→Recovery   1.22    1.63    2.12    -43.50% BTC
-2Jan-Jul 2024   Bull    0.90    1.51    1.37    -42.25% MVO 
-3Aug-Dec 2024   Strong Bull 3.15    2.01    2.27    -78.86% PPO ✅
-4Jan-Jul 2025   Sideways    1.84    -0.33   0.69    -59.22% PPO ✅
+|Window|Period      |Regime       |PPO Sharpe|MVO Sharpe  |BTC Sharpe  |PPO MaxDD  | Winner|
+|------|------------|-------------|----------|------------|------------|-----------|-------|
+|     1|Aug-Dec 2023|Bear→Recovery| 1.22     |1.63        |  2.12      | -43.50%   | BTC   |
+|     2|Jan-Jul 2024|Bull         | 0.90     |1.51        |  1.37      | -42.25%   | MVO   |
+|     3|Aug-Dec 2024|Strong Bull  | 3.15     |2.01        |  2.27      | -78.86%   | PPO ✅|
+|     4|Jan-Jul 2025|Sideways     | 1.84     |-0.33       |  0.69      | -59.22%   | PPO ✅|
+
 Interpretation:
 
 ✅ PPO excels in trending (Window 3) and choppy (Window 4) markets
