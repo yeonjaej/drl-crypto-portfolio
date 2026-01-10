@@ -37,11 +37,30 @@ class PortfolioEnv(gym.Env):
         self.cash = 1.0  # normalize portfolio to 1.0
         self.weights = np.zeros(self.n_assets)
         self.portfolio_value = self.initial_cash
-        self.a_t = 0.0  # EMA of returns
-        self.b_t = 0.0  # EMA of squared returns
         self.eta = 1 / (365*6)
         self.steps = 0
         self.episode_reward = 0.0
+
+        # --- WARM-UP INITIALIZATION ---
+        # Calculate the initial mean (a_t) and second moment (b_t) 
+        # using the lookback window so the agent starts with valid stats.
+        
+        # Get data from (t - lookback) to t
+        past_data = self.data[self.t - self.lookback : self.t]
+        
+        # Calculate simple returns for this period to estimate stats
+        # (Assuming simple returns for Sharpe, consistent with your step function)
+        past_returns = (past_data[1:] - past_data[:-1]) / past_data[:-1]
+        
+        # Assume an equal weight portfolio for initialization statistics
+        # (Or you can start with all zeros, but stats need to reflect market magnitude)
+        init_weights = np.ones(self.n_assets) / self.n_assets
+        portfolio_past_ret = np.dot(past_returns, init_weights)
+
+        self.a_t = np.mean(portfolio_past_ret) # EMA (return)
+        self.b_t = np.mean(portfolio_past_ret**2) # EMA *(return**2)
+        # -----------------------------------
+
 
         return self._get_observation(), {}
 
@@ -61,18 +80,45 @@ class PortfolioEnv(gym.Env):
         # Update portfolio value
         self.portfolio_value *= (1 + portfolio_return)
 
-        # Update differential Sharpe components
+        # ----------------------------------------------------------------------
+        # DIFFERENTIAL SHARPE RATIO (Moody & Saffell, 2001)
+        # ----------------------------------------------------------------------
+        # The goal is to maximize the Sharpe Ratio (Mean / StdDev).
+        # Since standard Sharpe is calculated over the whole episode, we need
+        # a "per-step" proxy to train the RL agent online.
+        #
+        # D_t represents the contribution of the CURRENT step's return to the 
+        # long-term Sharpe Ratio.
+        #
+        # Variables:
+        #   A_t: Exponential Moving Average (EMA) of returns (estimated Mean)
+        #   B_t: EMA of squared returns (estimated Second Moment)
+        #   delta_a: Deviation of current return from the mean (R_t - A_{t-1})
+        #   delta_b: Deviation of current sq. return from 2nd moment (R_t^2 - B_{t-1})
+        # ----------------------------------------------------------------------
+
+        # 1. Calculate how the current return (portfolio_return) shifts our moving averages
+        #    Note: We use the stats from the PREVIOUS step (self.a_t, self.b_t)
         delta_a = portfolio_return - self.a_t
         delta_b = portfolio_return**2 - self.b_t
-        self.a_t += self.eta * delta_a
-        self.b_t += self.eta * delta_b
 
+        #2. Calculate Variance: Var = E[x^2] - (E[x])^2
+        prev_variance = self.b_t - self.a_t**2
 
-        if self.b_t - self.a_t**2 > 1e-6:
-            d_sharpe = (self.b_t * delta_a - 0.5 * self.a_t * delta_b) / (self.b_t - self.a_t**2)**1.5
+        # 3. Calculate Reward
+        #    Formula: (B * delta_A - 0.5 * A * delta_B) / (Variance ^ 1.5)
+        #    Term 1 (B * delta_a): Rewards returns that drive the average up.
+        #    Term 2 (-0.5 * A * delta_b): Penalizes returns that increase variance (risk).
+        if prev_variance > 1e-6:
+            d_sharpe = (self.b_t * delta_a - 0.5 * self.a_t * delta_b) / (prev_variance**1.5)
         else:
             d_sharpe = 0.0
 
+        # 4. Update the Moving Averages for the NEXT step
+        #    eta is the "learning rate" of the moving average (forgetting factor)
+        self.a_t += self.eta * delta_a
+        self.b_t += self.eta * delta_b
+        
         reward = d_sharpe
 
         self.episode_reward += reward
