@@ -31,7 +31,6 @@ This project trains a Proximal Policy Optimization (PPO) agent to dynamically ma
 |     3|Aug-Dec 2024|Strong Bull  | 3.15     |2.01        |  2.27      | -31.18%   | PPO ✅|
 |     4|Jan-Jul 2025|Sideways     | 1.84     |-0.33       |  0.69      | -33.05%   | PPO ✅|
 
-Interpretation:
 
 ✅ PPO outperforms in sideways regime where MVO shows negative Sharpe.
 
