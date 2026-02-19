@@ -10,7 +10,7 @@ class PortfolioEnv(gym.Env):
     - Transaction costs (fees + slippage)
     - Position tracking
     """
-    TRADING_FEE = 0.0 #0.0002 #0.001      # 0.1% taker fee
+    TRADING_FEE = 0.0001 #0.001      # 0.1% taker fee
     SLIPPAGE = 0.#0.0005        # 0.05% estimated slippage
     TOTAL_COST = TRADING_FEE + SLIPPAGE  # 0.15% per side
 
@@ -47,8 +47,8 @@ class PortfolioEnv(gym.Env):
             self.t = self.lookback
         
         self.portfolio_value = self.initial_cash
-        #self.eta = 1 / (365*6)
-        self.eta = 2/(self.lookback+1)
+        self.eta = 1 / (365*6)
+        #self.eta = 2/(self.lookback+1)
         self.steps = 0
         self.episode_reward = 0.0
         self.cumulative_cost = 0.0
