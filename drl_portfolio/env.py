@@ -4,19 +4,31 @@ import numpy as np
 from gymnasium import spaces
 
 class PortfolioEnv(gym.Env):
-    def __init__(self, data, vol_features, initial_cash=1, lookback=60, max_steps=None):
+    """
+    portfolio env
+    - Cash position (index 0)
+    - Transaction costs (fees + slippage)
+    - Position tracking
+    """
+    TRADING_FEE = 0.0 #0.0002 #0.001      # 0.1% taker fee
+    SLIPPAGE = 0.#0.0005        # 0.05% estimated slippage
+    TOTAL_COST = TRADING_FEE + SLIPPAGE  # 0.15% per side
+
+    def __init__(self, data, vol_features, initial_cash=1., lookback=60, max_steps=None):
         super(PortfolioEnv, self).__init__()
         self.data = data  # shape: (T_total, n_assets)
         self.vol_features = vol_features  # shape: (T_total, 3) -> [vol20, vol20/vol60, VIX]
         self.lookback = lookback
         self.n_assets = self.data.shape[1]
+        self.n_actions = self.n_assets + 1 # +1 for cash position
 
         # allowed action space for fully invested portfolio
-        self.action_space = spaces.Box(low=-5, high=5, shape=(self.n_assets,), dtype=np.float32)
+        self.action_space = spaces.Box(low=-5, high=5, shape=(self.n_actions,), dtype=np.float32)
         
         # lookback for log returns / vol
+        obs_size = (self.n_assets + 3)* lookback + self.n_actions
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf,
-                                            shape=((self.n_assets + 3) * lookback,), dtype=np.float32) 
+                                            shape=(obs_size,), dtype=np.float32) 
         
         self.max_steps = max_steps or (len(self.data) - self.lookback - 1)
         self.initial_cash = initial_cash
@@ -34,12 +46,16 @@ class PortfolioEnv(gym.Env):
         else:
             self.t = self.lookback
         
-        self.cash = 1.0  # normalize portfolio to 1.0
-        self.weights = np.zeros(self.n_assets)
         self.portfolio_value = self.initial_cash
-        self.eta = 1 / (365*6)
+        #self.eta = 1 / (365*6)
+        self.eta = 2/(self.lookback+1)
         self.steps = 0
         self.episode_reward = 0.0
+        self.cumulative_cost = 0.0
+
+        # start fully in cash
+        self.weights = np.zeros(self.n_actions)
+        self.weights[0] = 1.0
 
         # --- WARM-UP INITIALIZATION ---
         # Calculate the initial mean (a_t) and second moment (b_t) 
@@ -57,8 +73,8 @@ class PortfolioEnv(gym.Env):
         init_weights = np.ones(self.n_assets) / self.n_assets
         portfolio_past_ret = np.dot(past_returns, init_weights)
 
-        self.a_t = np.mean(portfolio_past_ret) # EMA (return)
-        self.b_t = np.mean(portfolio_past_ret**2) # EMA *(return**2)
+        self.a_t = 0.0 #np.mean(portfolio_past_ret) # EMA (return)
+        self.b_t = 0.0 # np.mean(portfolio_past_ret**2) # EMA *(return**2)
         # -----------------------------------
 
 
@@ -68,17 +84,38 @@ class PortfolioEnv(gym.Env):
         if self.t + 1 >= len(self.data):
             return self._get_observation(), 0.0, True, False, {}
         # Normalize weights using softmax
-        weights = np.exp(action)
-        weights /= np.sum(weights)
+        target_weights = np.exp(action - np.max(action))
+        target_weights /= np.sum(target_weights)
+
+        # turnover= sum of absolute weight changes / 2
+        # (dividing by 2 because every sell has a correspoinding buy)
+        weight_diff = np.abs(target_weights - self.weights)
+        turnover = np.sum(weight_diff) / 2.0 
+        transaction_cost = turnover * self.TOTAL_COST
+        self.cumulative_cost += transaction_cost
 
         # Compute portfolio return
         prev_prices = self.data[self.t]
         curr_prices = self.data[self.t + 1]
-        returns = (curr_prices - prev_prices) / prev_prices
-        portfolio_return = np.dot(weights, returns)
+        asset_returns = (curr_prices - prev_prices) / prev_prices
+
+        # cash return = 0,
+        crypto_weights = target_weights[1:]
+        portfolio_return = np.dot(crypto_weights, asset_returns)
+
+        portfolio_return -= transaction_cost
 
         # Update portfolio value
         self.portfolio_value *= (1 + portfolio_return)
+
+        #   Drift weights (market movement changes weights) ────
+        #   After the market moves, actual weights shift.
+        #   Cash weight stays, crypto weights scale by (1 + r_i)
+        drifted = target_weights.copy()
+        drifted[1:] = target_weights[1:] * (1 + asset_returns)
+        drifted /= np.sum(drifted)
+        self.weights = drifted
+        
 
         # ----------------------------------------------------------------------
         # DIFFERENTIAL SHARPE RATIO (Moody & Saffell, 2001)
@@ -97,44 +134,47 @@ class PortfolioEnv(gym.Env):
         #   delta_b: Deviation of current sq. return from 2nd moment (R_t^2 - B_{t-1})
         # ----------------------------------------------------------------------
 
+        
+
         # 1. Calculate how the current return (portfolio_return) shifts our moving averages
         #    Note: We use the stats from the PREVIOUS step (self.a_t, self.b_t)
+
         delta_a = portfolio_return - self.a_t
         delta_b = portfolio_return**2 - self.b_t
 
         #2. Calculate Variance: Var = E[x^2] - (E[x])^2
-        prev_variance = self.b_t - self.a_t**2
+        prev_variance = max(self.b_t - self.a_t**2, 1e-4)
 
         # 3. Calculate Reward
         #    Formula: (B * delta_A - 0.5 * A * delta_B) / (Variance ^ 1.5)
         #    Term 1 (B * delta_a): Rewards returns that drive the average up.
         #    Term 2 (-0.5 * A * delta_b): Penalizes returns that increase variance (risk).
-        if prev_variance > 1e-6:
-            d_sharpe = (self.b_t * delta_a - 0.5 * self.a_t * delta_b) / (prev_variance**1.5)
-        else:
-            d_sharpe = 0.0
+        #if prev_variance > 1e-6:
+        d_sharpe = (self.b_t * delta_a - 0.5 * self.a_t * delta_b) / (prev_variance**1.5)
+        #else:
+        #    d_sharpe = 0.0
 
         # 4. Update the Moving Averages for the NEXT step
         #    eta is the "learning rate" of the moving average (forgetting factor)
         self.a_t += self.eta * delta_a
         self.b_t += self.eta * delta_b
         
-        reward = d_sharpe
+        reward = np.clip(d_sharpe, -2.0, 2.0)
 
         self.episode_reward += reward
-        self.weights = weights
         self.t += 1
         self.steps +=1
         
-        terminated = self.t >= len(self.data) - 1 or self.steps >= self.max_steps
-        truncated = False
+        terminated = self.t >= len(self.data) - 1  
+        truncated = self.steps >= self.max_steps
         info = {}
 
         if terminated:
             info["episode"] = {
                 "r": self.episode_reward,      # total reward
                 "l": self.steps,
-                "final_value": self.portfolio_value                                # episode length
+                "final_value": self.portfolio_value,                                # episode length
+                "cumulative_cost": self.cumulative_cost,
             }
         # in Gymnasium, step() must return exactly below
         # 1st return val; observation:  agent "Sees it."
@@ -157,7 +197,11 @@ class PortfolioEnv(gym.Env):
         # vol_feats = self.vol_features[self.t]  # shape: (3,)
         vol_history = vol_history.T # shape(lookback, 3)
 
-        state = np.vstack([returns, vol_history])
+        market_features = np.vstack([returns, vol_history]).flatten()
+        portfolio_state = self.weights.copy()
+        obs = np.concatenate([market_features, portfolio_state])
+        return obs.astype(np.float32)
+        #state = np.vstack([returns, vol_history])
 
-        return state.flatten().astype(np.float32)
+        #return state.flatten().astype(np.float32)
 
