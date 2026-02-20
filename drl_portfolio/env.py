@@ -10,8 +10,8 @@ class PortfolioEnv(gym.Env):
     - Transaction costs (fees + slippage)
     - Position tracking
     """
-    TRADING_FEE = 0.0001 #0.001      # 0.1% taker fee
-    SLIPPAGE = 0.#0.0005        # 0.05% estimated slippage
+    TRADING_FEE = 0.001      # 0.1% taker fee
+    SLIPPAGE = 0.0005        # 0.05% estimated slippage
     TOTAL_COST = TRADING_FEE + SLIPPAGE  # 0.15% per side
 
     def __init__(self, data, vol_features, initial_cash=1., lookback=60, max_steps=None):
