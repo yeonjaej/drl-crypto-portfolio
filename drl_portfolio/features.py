@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 # Feature generation functions here
-def generate_features(price_df, lookbacks=(20, 60)):
+def generate_features(price_df, lookbacks=(20, 60), trend_window=600, stress_window=180):
     """
     Generate log returns and volatility features for crypto data.
 
@@ -29,13 +29,22 @@ def generate_features(price_df, lookbacks=(20, 60)):
     vol_feats_df = pd.DataFrame(np.stack([vol_short, vol_ratio, vix_proxy], axis=1),
                                  index=log_returns.index)
     
+    sma = price_df.rolling(window=trend_window).mean()
+    trend_distance = (price_df / sma) - 1.0
+
+    rolling_corr = log_returns.rolling(window=stress_window).corr()
+    mean_corr = rolling_corr.groupby(level=0).apply(lambda x: (np.nansum(x.values) - len(x)) / (len(x)**2 - len(x)) if len(x) > 1 else 0)
+    mean_corr_df = pd.DataFrame(mean_corr, columns=['mean_corr'], index=log_returns.index)
+    regime_feats_df = pd.concat([trend_distance, mean_corr_df], axis = 1)
+    all_feats_df = pd.concat([vol_feats_df, regime_feats_df], axis=1).dropna()
+    valid_index = all_feats_df.index
     # 5. Drop the rows that don't have enough history.
-    vol_feats_df = vol_feats_df.dropna()
+    #vol_feats_df = vol_feats_df.dropna()
 
     # 6. Align prices and features
-    valid_index = vol_feats_df.index
     log_returns = log_returns.loc[valid_index]
     aligned_prices = price_df.loc[valid_index].values
-    vol_feats = vol_feats_df.values
+    vol_feats = vol_feats_df.loc[valid_index].values
+    regime_feats = regime_feats_df.loc[valid_index].values
 
-    return log_returns, vol_feats, aligned_prices, valid_index
+    return log_returns, vol_feats, regime_feats, aligned_prices, valid_index

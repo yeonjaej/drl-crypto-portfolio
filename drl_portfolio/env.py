@@ -13,20 +13,25 @@ class PortfolioEnv(gym.Env):
     TRADING_FEE = 0.001      # 0.1% taker fee
     SLIPPAGE = 0.0005        # 0.05% estimated slippage
     TOTAL_COST = TRADING_FEE + SLIPPAGE  # 0.15% per side
+    N_VOL = 3
+    N_CASH = 1
 
-    def __init__(self, data, vol_features, initial_cash=1., lookback=60, max_steps=None):
+    def __init__(self, data, vol_features, regime_features, initial_cash=1., lookback=60, max_steps=None):
         super(PortfolioEnv, self).__init__()
         self.data = data  # shape: (T_total, n_assets)
         self.vol_features = vol_features  # shape: (T_total, 3) -> [vol20, vol20/vol60, VIX]
+        self.regime_features = regime_features
         self.lookback = lookback
         self.n_assets = self.data.shape[1]
-        self.n_actions = self.n_assets + 1 # +1 for cash position
+        self.n_actions = self.n_assets + self.N_CASH # +1 for cash position
 
         # allowed action space for fully invested portfolio
         self.action_space = spaces.Box(low=-5, high=5, shape=(self.n_actions,), dtype=np.float32)
         
         # lookback for log returns / vol
-        obs_size = (self.n_assets + 3)* lookback + self.n_actions
+        features_per_step = self.n_assets + self.N_VOL + self.n_assets + self.N_CASH
+        obs_size = (features_per_step)* lookback + self.n_actions
+
         self.observation_space = spaces.Box(low=-np.inf, high=np.inf,
                                             shape=(obs_size,), dtype=np.float32) 
         
@@ -138,38 +143,37 @@ class PortfolioEnv(gym.Env):
 
         # 1. Calculate how the current return (portfolio_return) shifts our moving averages
         #    Note: We use the stats from the PREVIOUS step (self.a_t, self.b_t)
-
         delta_a = portfolio_return - self.a_t
         delta_b = portfolio_return**2 - self.b_t
-
-        #2. Calculate Variance: Var = E[x^2] - (E[x])^2
-        prev_variance = max(self.b_t - self.a_t**2, 1e-4)
-
-        # 3. Calculate Reward
-        #    Formula: (B * delta_A - 0.5 * A * delta_B) / (Variance ^ 1.5)
-        #    Term 1 (B * delta_a): Rewards returns that drive the average up.
-        #    Term 2 (-0.5 * A * delta_b): Penalizes returns that increase variance (risk).
-        #if prev_variance > 1e-6:
+        
+        # prev_variance = max(self.b_t - self.a_t**2, 1e-4)
+        prev_variance = max(self.b_t - self.a_t**2, 1e-3) # higher variance floor for full fee env
+        
         d_sharpe = (self.b_t * delta_a - 0.5 * self.a_t * delta_b) / (prev_variance**1.5)
-        #else:
-        #    d_sharpe = 0.0
 
-        # 4. Update the Moving Averages for the NEXT step
-        #    eta is the "learning rate" of the moving average (forgetting factor)
         self.a_t += self.eta * delta_a
         self.b_t += self.eta * delta_b
         
-        reward = np.clip(d_sharpe, -2.0, 2.0)
+        cash_penalty_rate = 0.05 
+        cash_burn = self.weights[0] * cash_penalty_rate * self.eta
+
+        # Subtract the cash burn from the Sharpe reward
+        final_reward = d_sharpe # - cash_burn # cash_burn for full fee env
+        
+        # Clip for stable PPO training
+        # reward = np.clip(final_reward, -2.0, 2.0)
+        reward = np.clip(final_reward, -1.0, 1.0) # tighter clip for full fee env
 
         self.episode_reward += reward
+        
         self.t += 1
-        self.steps +=1
+        self.steps += 1
         
         terminated = self.t >= len(self.data) - 1  
         truncated = self.steps >= self.max_steps
         info = {}
 
-        if terminated:
+        if terminated or truncated:
             info["episode"] = {
                 "r": self.episode_reward,      # total reward
                 "l": self.steps,
@@ -197,7 +201,9 @@ class PortfolioEnv(gym.Env):
         # vol_feats = self.vol_features[self.t]  # shape: (3,)
         vol_history = vol_history.T # shape(lookback, 3)
 
-        market_features = np.vstack([returns, vol_history]).flatten()
+        regime_history = self.regime_features[self.t - self.lookback + 1: self.t + 1].T
+
+        market_features = np.vstack([returns, vol_history, regime_history]).flatten()
         portfolio_state = self.weights.copy()
         obs = np.concatenate([market_features, portfolio_state])
         return obs.astype(np.float32)
