@@ -26,15 +26,13 @@ This project trains a Proximal Policy Optimization (PPO) agent to dynamically ma
 **Performance Summary (Out-of-Sample)**
 |Window|Period      |Regime       |PPO Sharpe|MVO Sharpe  |BTC Sharpe  |PPO MaxDD  | Winner|
 |------|------------|-------------|----------|------------|------------|-----------|-------|
-|     1|Aug-Dec 2023|Bear→Recovery| 1.22     |1.63        |  2.12      | -31.11%   | BTC   |
+|     1|Aug-Dec 2023|Strong Bull  | 1.22     |1.63        |  2.12      | -31.11%   | BTC   |
 |     2|Jan-Jul 2024|Bull         | 0.90     |1.51        |  1.37      | -27.59%   | MVO   |
 |     3|Aug-Dec 2024|Strong Bull  | 3.15     |2.01        |  2.27      | -31.18%   | PPO ✅|
 |     4|Jan-Jul 2025|Sideways     | 1.84     |-0.33       |  0.69      | -33.05%   | PPO ✅|
 
-Interpretation:
 
-✅ PPO excels in trending (Window 3) and choppy (Window 4) markets\
-⚠️ Underperforms during smooth recoveries (Windows 1-2)\
+✅ PPO outperforms in sideways regime where MVO shows negative Sharpe.
 
 
 ## 🚀 Quick Start
